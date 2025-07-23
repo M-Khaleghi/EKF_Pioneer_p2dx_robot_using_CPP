@@ -33,6 +33,10 @@
 			<Add option="-fexceptions" />
 		</Compiler>
 		<Unit filename="main.cpp" />
-		<Extensions />
+		<Extensions>
+			<code_completion>
+				<search_path add="..\lib\eigen" />
+			</code_completion>
+		</Extensions>
 	</Project>
 </CodeBlocks_project_file>

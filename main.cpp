@@ -1,8 +1,9 @@
 #include <iostream>
 #include<cmath>
 #include<fstream>
+#include<Eigen/Dense>
 using namespace std;
-
+using namespace Eigen;
 
 float *time_series(float t_start,float t_r,float t_end,int n);
 
@@ -51,11 +52,20 @@ int main()
 
     //Extended Kalman Filter
     float x_pri = x0,y_pri = y0, theta_pri = theta0; //initilizing of the system states
-    float P_cov[3][3]={{0.1,0,0},{0,0.1,0},{0,0,0.1}};
+    Matrix3f P_pred;
+    P_pred<<0.1,0,0,
+           0,0.1,0,
+           0,0,0.1;
     float x_pred,y_pred,theta_pred;
 
     float **arr1_p = nullptr;
     float **arr2_p = nullptr;
+
+for(int c1=0;c1<=n_t;c1++){
+    //save state of the system
+    state_p[0][c1] = x_pri;
+    state_p[1][c1] = y_pri;
+    state_p[2][c1] = theta_pri;
 
     //Prediction
     x_pred = x_pri + v*cos(theta_pri)*dt;
@@ -73,17 +83,18 @@ int main()
         arr2_p[i] = new float [3];
         for(int j=0;j<3;j++){
             arr1_p[i][j] = F[i][j];  //assigning F and P_cov to arr1 and arr2
-            arr2_p[i][j] = P_cov[i][j];
+            arr2_p[i][j] = P_pred(i,j);
         }
     }
     float **result_p = multy(arr1_p,arr2_p,3,3,3,3); //multiply F*P
     float **FT_p = Trans(arr1_p,3,3); //F Transpose
-    float **result2_p = multy(result_p,FT_p,3,3,3,3);// multyply F*P*FT
+    float **result2_p = multy(result_p,FT_p,3,3,3,3);// multiply F*P*FT
     for(int i=0;i<3;i++){
         for(int j=0;j<3;j++){
-            P_cov[i][j] = result2_p[i][j];   //assigning result of F*P*FT to P_cov
+            P_pred(i,j) = result2_p[i][j];   //assigning result of F*P*FT to P_cov
         }
     }
+//    cout<<"P_pred=\n"<<P_pred<<endl;
     //deleting three pointers
     for(int i=0;i<3;i++){
         delete[] FT_p[i];
@@ -97,13 +108,45 @@ int main()
     //correction
 
     //H Jacobian
-
+    Matrix3f H = Matrix3f::Identity();
+    Vector3f z;
+    z<<state_p[0][c1],state_p[1][c1],state_p[2][c1];
+    Vector3f state_pred;
+    state_pred<<x_pred,y_pred,theta_pred;
+    Vector3f y = z - H*state_pred;
     //Kalman Gain updating
-
+    Matrix3f R = Matrix3f::Identity();
+    Matrix3f S = H*P_pred*H.transpose()+R;
+    Matrix3f K = P_pred*H.transpose()*S.inverse();
+//    cout<<"K=\n"<<K<<endl;
     //state updating
-
+    Vector3f state_new = state_pred+K*y;
     //Covariance matrix P updating
+    Matrix3f P_new = (Matrix3f::Identity()-K*H)*P_pred;
+cout<<"satte_new=/n"<<state_new<<endl;
+cout<<"P_new=/n"<<P_new<<endl;
+    //assign state_new to state_pri
+    x_pri = state_new(0,0);
+    y_pri = state_new(1,0);
+    theta_pri = state_new(2,0);
+    //assign P_new to P_pred
+    P_pred = P_new;
+    cout<<"c1=\n"<<c1<<endl;
+}
+    //save the result of EKF to ekfdata.csv file
+    ofstream file1("C:\\Users\\mkhaleghi\\Documents\\C++\\EKF_pioneerp3dx\\ekfdata.csv");
 
+    //saving the data in the data.csv file
+    if (file1.is_open()) {
+        file1 << "Time,x,y,theta\n";
+        for (int i = 0; i <= n_t; i++) {
+            file1 << T[i] << "," << state_p[0][i] << "," << state_p[1][i] << "," << state_p[2][i] << "\n";
+        }
+        file1.close();
+            cout << "ekfdata.csv file created and the data was saved successfully.\n";
+    } else {
+            cout << "Unable to open file.\n";
+    }
     delete[] T;
     for(int i=0;i<3;i++){
         delete[] state_p[i];
